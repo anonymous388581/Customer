@@ -23,12 +23,30 @@ from utils import *
 
 logging.basicConfig(level=logging.ERROR)
 logger = logging.getLogger(__name__)
+file_flow_logger = logging.getLogger("movie_file_flow")
+
+
+def _log_file_flow_error(stage, error):
+    message = str(error)
+    for secret in (BOT_TOKEN, API_HASH, DATABASE_URI, DATABASE_URI2):
+        if secret:
+            message = message.replace(secret, "[REDACTED]")
+    file_flow_logger.error("%s failed: %s: %s", stage, type(error).__name__, message)
 
 TIMEZONE = "Asia/Kolkata"
 BATCH_FILES = {}
 
 @Client.on_message(filters.command("start") & filters.incoming)
 async def start(client, message):
+    is_movie_file_payload = (
+        len(message.command) == 2 and message.command[1].startswith("file_")
+    )
+    if is_movie_file_payload:
+        file_flow_logger.info(
+            "received start payload type=file payload_length=%d username_configured=%s",
+            len(message.command[1]),
+            bool(temp.U_NAME),
+        )
     if EMOJI_MODE:
         await message.react(emoji=random.choice(REACTIONS))
     m = message
@@ -160,11 +178,19 @@ async def start(client, message):
         pre, grp_id, file_id = data.split('_', 2)
     except:
         pre, grp_id, file_id = "", 0, data
+    if is_movie_file_payload:
+        file_flow_logger.info(
+            "parsed start payload type=file grp_id=%s file_id_length=%d",
+            grp_id,
+            len(file_id),
+        )
 
     try:
         settings = await get_settings(int(data.split("_", 2)[1]))
         if settings.get('fsub_id', AUTH_CHANNEL) == AUTH_REQ_CHANNEL:
             if AUTH_REQ_CHANNEL and not await is_req_subscribed(client, message):
+                if is_movie_file_payload:
+                    file_flow_logger.info("force subscription blocked file payload (join-request channel)")
                 try:
                     invite_link = await client.create_chat_invite_link(int(AUTH_REQ_CHANNEL), creates_join_request=True)
                 except ChatAdminRequired:
@@ -187,6 +213,8 @@ async def start(client, message):
             id = settings.get('fsub_id', AUTH_CHANNEL)
             channel = int(id)
             if settings.get('fsub_id', AUTH_CHANNEL) and not await is_subscribed(client, message.from_user.id, channel):
+                if is_movie_file_payload:
+                    file_flow_logger.info("force subscription blocked file payload (channel membership)")
                 invite_link = await client.create_chat_invite_link(channel)
                 btn = [[
                         InlineKeyboardButton("⛔️ ᴊᴏɪɴ ɴᴏᴡ ⛔️", url=invite_link.invite_link)
@@ -202,11 +230,21 @@ async def start(client, message):
                 )
                 return
     except Exception as e:
+        if is_movie_file_payload:
+            _log_file_flow_error("force subscription check", e)
         await log_error(client, f"Got Error In Force Subscription Funtion.\n\n Error - {e}")
         print(f"Error In Fsub :- {e}")
 
     user_id = m.from_user.id
-    if not await db.has_premium_access(user_id):
+    try:
+        has_premium_access = await db.has_premium_access(user_id)
+    except Exception as error:
+        if is_movie_file_payload:
+            _log_file_flow_error("premium access check", error)
+        raise
+    if is_movie_file_payload:
+        file_flow_logger.info("premium access=%s", has_premium_access)
+    if not has_premium_access:
         try:
             grp_id = int(grp_id)
             user_verified = await db.is_user_verified(user_id)
@@ -214,6 +252,13 @@ async def start(client, message):
             is_second_shortener = await db.use_second_shortener(user_id, settings.get('verify_time', TWO_VERIFY_GAP)) 
             is_third_shortener = await db.use_third_shortener(user_id, settings.get('third_verify_time', THREE_VERIFY_GAP))
             if settings.get("is_verify", IS_VERIFY) and (not user_verified or is_second_shortener or is_third_shortener):                
+                if is_movie_file_payload:
+                    file_flow_logger.info(
+                        "verification gate returned before file send: verified=%s second_shortener=%s third_shortener=%s",
+                        user_verified,
+                        is_second_shortener,
+                        is_third_shortener,
+                    )
                 verify_id = ''.join(random.choices(string.ascii_uppercase + string.digits, k=7))
                 await db.create_verify_id(user_id, verify_id)
                 temp.VERIFICATIONS[user_id] = grp_id
@@ -245,7 +290,11 @@ async def start(client, message):
                 await n.delete()
                 await m.delete()
                 return
+            if is_movie_file_payload:
+                file_flow_logger.info("verification gate passed; continuing to file lookup")
         except Exception as e:
+            if is_movie_file_payload:
+                _log_file_flow_error("verification check", e)
             await log_error(client, f"Got Error In Verification Funtion.\n\n Error - {e}")
             print(f"Error In Verification - {e}")
             await message.reply_text(f"Something Want Wrong ! Message Here - @SilentXBotz_Support")
@@ -298,8 +347,21 @@ async def start(client, message):
         return
 
     user = message.from_user.id
-    files_ = await get_file_details(file_id)  
+    try:
+        files_ = await get_file_details(file_id)
+    except Exception as error:
+        if is_movie_file_payload:
+            _log_file_flow_error("file details lookup", error)
+        raise
+    if is_movie_file_payload:
+        file_flow_logger.info(
+            "file details lookup returned_file=%s media_type=%s",
+            bool(files_),
+            getattr(files_[0], "file_type", None) if files_ else None,
+        )
     settings = await get_settings(int(grp_id))
+    if is_movie_file_payload:
+        file_flow_logger.info("file delivery settings loaded")
     if not files_:
         pre, file_id = ((base64.urlsafe_b64decode(data + "=" * (-len(data) % 4))).decode("ascii")).split("_", 1)
         try:
@@ -313,11 +375,18 @@ async def start(client, message):
                 btn = [
                     [InlineKeyboardButton('𝖴𝗉𝖽𝖺𝗍𝖾 𝖢𝗁𝖺𝗇𝗇𝖾𝗅', url=UPDATE_CHANNEL_LNK)]
                 ]
-            msg = await client.send_cached_media(
-                chat_id=message.from_user.id,
-                file_id=file_id,
-                protect_content=settings.get('file_secure', PROTECT_CONTENT),
-                reply_markup=InlineKeyboardMarkup(btn))
+            if is_movie_file_payload:
+                file_flow_logger.info("fallback send_cached_media reached")
+            try:
+                msg = await client.send_cached_media(
+                    chat_id=message.from_user.id,
+                    file_id=file_id,
+                    protect_content=settings.get('file_secure', PROTECT_CONTENT),
+                    reply_markup=InlineKeyboardMarkup(btn))
+            except Exception as error:
+                if is_movie_file_payload:
+                    _log_file_flow_error("fallback send_cached_media", error)
+                raise
 
             filetype = msg.media
             file = getattr(msg, filetype.value)
@@ -337,8 +406,9 @@ async def start(client, message):
             await msg.delete()
             await k.edit_text("<b>ʏᴏᴜʀ ᴠɪᴅᴇᴏ / ꜰɪʟᴇ ɪꜱ ꜱᴜᴄᴄᴇꜱꜱꜰᴜʟʟʏ ᴅᴇʟᴇᴛᴇᴅ !!</b>")
             return
-        except Exception:
-            logger.exception("Failed to send cached media")
+        except Exception as error:
+            if not is_movie_file_payload:
+                logger.exception("Failed to send cached media")
         return await message.reply('ɴᴏ ꜱᴜᴄʜ ꜰɪʟᴇ ᴇxɪꜱᴛꜱ !')
     
     files = files_[0]
@@ -365,13 +435,22 @@ async def start(client, message):
         btn = [
             [InlineKeyboardButton('𝖴𝗉𝖽𝖺𝗍𝖾 𝖢𝗁𝖺𝗇𝗇𝖾𝗅', url=UPDATE_CHANNEL_LNK)]
         ]
-    msg = await client.send_cached_media(
-        chat_id=message.from_user.id,
-        file_id=file_id,
-        caption=f_caption,
-        protect_content=settings.get('file_secure', PROTECT_CONTENT),
-        reply_markup=InlineKeyboardMarkup(btn)
-    )
+    if is_movie_file_payload:
+        file_flow_logger.info("send_cached_media reached media_type=%s", files.file_type)
+    try:
+        msg = await client.send_cached_media(
+            chat_id=message.from_user.id,
+            file_id=file_id,
+            caption=f_caption,
+            protect_content=settings.get('file_secure', PROTECT_CONTENT),
+            reply_markup=InlineKeyboardMarkup(btn)
+        )
+    except Exception as error:
+        if is_movie_file_payload:
+            _log_file_flow_error("send_cached_media", error)
+        raise
+    if is_movie_file_payload:
+        file_flow_logger.info("send_cached_media completed")
     k = await msg.reply(f"<b>♻️ ᴛʜɪꜱ ꜰɪʟᴇ ᴡɪʟʟ ᴀᴜᴛᴏ ᴅᴇʟᴇᴛᴇ ᴀꜰᴛᴇʀ {get_time(DELETE_TIME)}</b>", quote=True)     
     await asyncio.sleep(DELETE_TIME)
     await msg.delete()

@@ -29,6 +29,7 @@ import tracemalloc
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.ERROR)
+file_flow_logger = logging.getLogger("movie_file_flow")
 
 tracemalloc.start()
 
@@ -731,6 +732,11 @@ async def advantage_spoll_choker(bot, query):
 @Client.on_callback_query()
 async def cb_handler(client: Client, query: CallbackQuery):
     lazyData = query.data
+    if lazyData.startswith("file#"):
+        file_flow_logger.info(
+            "file callback received file_id_length=%d",
+            len(lazyData.split("#", 1)[1]),
+        )
     try:
         link = await client.create_chat_invite_link(int(REQST_CHANNEL))
     except:
@@ -743,7 +749,23 @@ async def cb_handler(client: Client, query: CallbackQuery):
         user = query.message.reply_to_message.from_user.id
         if int(user) != 0 and query.from_user.id != int(user):
             return await query.answer(script.ALRT_TXT, show_alert=True)
-        await query.answer(url=f"https://t.me/{temp.U_NAME}?start=file_{query.message.chat.id}_{file_id}")          
+        payload = f"file_{query.message.chat.id}_{file_id}"
+        bot_username = getattr(getattr(client, "me", None), "username", None)
+        file_flow_logger.info(
+            "callback file link generated: grp_id=%s file_id_length=%d payload_length=%d "
+            "payload_valid=%s username_configured=%s username_matches_client=%s",
+            query.message.chat.id,
+            len(file_id),
+            len(payload),
+            1 <= len(payload) <= 64 and all(c.isalnum() or c in "_-" for c in payload),
+            bool(temp.U_NAME),
+            bool(temp.U_NAME and temp.U_NAME == bot_username),
+        )
+        try:
+            await query.answer(url=f"https://t.me/{temp.U_NAME}?start={payload}")
+        except Exception as error:
+            file_flow_logger.error("callback deep-link answer failed: %s", type(error).__name__)
+            raise
                             
     elif query.data.startswith("sendfiles"):
         clicked = query.from_user.id
