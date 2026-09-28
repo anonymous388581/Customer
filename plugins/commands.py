@@ -24,11 +24,6 @@ from utils import *
 logging.basicConfig(level=logging.ERROR)
 logger = logging.getLogger(__name__)
 
-logger.debug("Debug message for testing")
-logger.info("Info message for testing")
-logger.warning("Warning message for testing")
-logger.error("Error message for testing")
-
 TIMEZONE = "Asia/Kolkata"
 BATCH_FILES = {}
 
@@ -342,8 +337,8 @@ async def start(client, message):
             await msg.delete()
             await k.edit_text("<b>ʏᴏᴜʀ ᴠɪᴅᴇᴏ / ꜰɪʟᴇ ɪꜱ ꜱᴜᴄᴄᴇꜱꜱꜰᴜʟʟʏ ᴅᴇʟᴇᴛᴇᴅ !!</b>")
             return
-        except:
-            pass
+        except Exception:
+            logger.exception("Failed to send cached media")
         return await message.reply('ɴᴏ ꜱᴜᴄʜ ꜰɪʟᴇ ᴇxɪꜱᴛꜱ !')
     
     files = files_[0]

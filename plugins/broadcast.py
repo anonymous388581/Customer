@@ -155,10 +155,11 @@ async def broadcast_messages_group(chat_id, message):
     except FloodWait as e:
         await asyncio.sleep(e.value)
         return await broadcast_messages_group(chat_id, message)
-    except Exception as e:
+    except Exception:
+        logging.exception("Group broadcast delivery failed")
         await db.delete_chat(int(chat_id))       
         logging.info(f"{chat_id} - PeerIdInvalid")
-        return False, "deleted", f'{e}\n\n'
+        return False, "deleted", "Group broadcast failed.\n\n"
     
 async def junk_group(chat_id, message):
     try:
@@ -168,10 +169,11 @@ async def junk_group(chat_id, message):
     except FloodWait as e:
         await asyncio.sleep(e.value)
         return await junk_group(chat_id, message)
-    except Exception as e:
+    except Exception:
+        logging.exception("Group junk-cleanup delivery failed")
         await db.delete_chat(int(chat_id))       
         logging.info(f"{chat_id} - PeerIdInvalid")
-        return False, "deleted", f'{e}\n\n'
+        return False, "deleted", "Group cleanup failed.\n\n"
     
 
 async def clear_junk(user_id, message):
@@ -193,7 +195,8 @@ async def clear_junk(user_id, message):
         await db.delete_user(int(user_id))
         logging.info(f"{user_id} - PeerIdInvalid")
         return False, "Error"
-    except Exception as e:
+    except Exception:
+        logging.exception("User junk-cleanup delivery failed")
         return False, "Error"
 
 async def broadcast_messages(user_id, message, reply_markup=None):
@@ -214,7 +217,8 @@ async def broadcast_messages(user_id, message, reply_markup=None):
         await db.delete_user(int(user_id))
         logging.info(f"{user_id} - PeerIdInvalid")
         return False, "Error"
-    except Exception as e:
+    except Exception:
+        logging.exception("User broadcast delivery failed")
         return False, "Error"
 
 

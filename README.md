@@ -41,21 +41,35 @@
 - Now Owner Can Reset All Connect Groups Settings 
 
 
-## Variables
-* `BOT_TOKEN`: Create A Bot Using [@BotFather](https://telegram.dog/BotFather), and get the Telegram API token.
-* `API_ID`: Get This Value From [telegram.org](https://my.telegram.org/apps)
-* `API_HASH`: Get This Value From [telegram.org](https://my.telegram.org/apps)
-* `ADMINS`: ID Of Admins. (Multiple admins can be used separated by space)
-* `DATABASE_URI`: Your First MongoDB URL. Get This Value From [MongoDB](https://www.mongodb.com).
-* `MULTIPLE_DB`: Set It True Or False. If You Set This True Then All Files Saved In Second MongoDB If First MongoDB 80MB Left.
-* `DATABASE_URI2`: Your Second MongoDB URL (Optional - Add This If You Set MULTIPLE_DB True.).
-* `LOG_CHANNEL` : A Channel To Log The Activities Of Bot. Add Channel Id And Make Sure Bot Is An Admin In The Channel.
-* `SUPPORT_GROUP`: Add Your Support Group Id In This Veriable.
-* `BIN_CHANNEL`: A Channel To The Stream And Download Feature, Add Channel Id And Make Bot Admin In Channel.
-* `FQDN`: Make A Veriable On Your Deploying Plartform AndAdd You Deployed Bot App Link
-* `AUTH_CHANNEL`: ID of force subscribe channels (Multiple channels can be used separated by space)
-* `CHANNELS`: Username or ID of your files channels (Multiple channels can be used separated by space)
-*  Before Deploying The Bot Fill All Veriables. Check [info.py](https://github.com/NBBotz/Auto_Filter_Bot/blob/SilentXBotz/info.py) For All Veriables.
+## Configuration
+
+Set these required environment variables in your deployment platform:
+
+| Variable | Purpose |
+| --- | --- |
+| `BOT_TOKEN` | Telegram bot token from BotFather |
+| `API_ID` | Telegram API ID from [my.telegram.org](https://my.telegram.org/apps) |
+| `API_HASH` | Telegram API hash from [my.telegram.org](https://my.telegram.org/apps) |
+| `DATABASE_URI` | MongoDB connection URI |
+
+Optional variables include `DATABASE_NAME` (defaults to `Cluster0`), `COLLECTION_NAME` (defaults to `SilentXBotz_files`), and `MULTIPLE_DB` (defaults to `False`). Set `DATABASE_URI2` only when `MULTIPLE_DB=True`. Configure `ADMINS`, `CHANNELS`, `LOG_CHANNEL`, `BIN_CHANNEL`, `MOVIE_UPDATE_CHANNEL`, `INDEX_REQ_CHANNEL`, and `AUTH_CHANNEL` for your Telegram setup. `INDEX_REQ_CHANNEL` defaults to the existing configured channel. `FQDN` may be set to the public hostname, with or without `https://`.
+
+`SHORTENER_API`, `SHORTENER_API2`, and `SHORTENER_API3` are optional credentials for their corresponding shortener services. Their values, like all Telegram and MongoDB credentials, must be supplied through environment variables and must not be committed. Optional boolean settings accept `true`/`false`, `1`/`0`, `yes`/`no`, or `on`/`off`.
+
+### Render Web Service
+
+Use one service and one bot process:
+
+- Service type: **Web Service**
+- Runtime: **Docker**, using the repository `Dockerfile`
+- Build: Dockerfile installs requirements with `pip install --no-cache-dir -r requirements.txt`
+- Start command: `python3 bot.py` (also the Dockerfile command)
+- Port: Render supplies `PORT`; the server binds to `0.0.0.0:$PORT`. Do not hardcode a public IP or port.
+- Health check path: `/health` (returns `OK` without Telegram authentication)
+
+Set the four required variables above in Render's Environment settings. Set `FQDN` to the service's public hostname if another feature needs the public URL; HTTPS is normalized automatically. Do not configure a second worker running `bot.py` alongside the Web Service.
+
+For a native Python Render runtime instead of Docker, use build command `pip install -r requirements.txt` and start command `python3 bot.py`.
 
 ## 🚀 Deployment Methods
 

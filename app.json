@@ -60,7 +60,7 @@
         },
         "DATABASE_URI2": {
             "description": "mongoDB URI. Get this value from https://www.mongodb.com.",
-            "required": true
+            "required": false
         },
         "DATABASE_NAME": {
             "description": "Name of the database in mongoDB.",
@@ -77,7 +77,7 @@
         "url": "heroku/python"
     }],
     "formation": {
-        "worker": {
+        "web": {
             "quantity": 1,
             "size": "eco"
         }

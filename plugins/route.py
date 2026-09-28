@@ -22,6 +22,11 @@ async def root_route_handler(request):
     return web.json_response("Telegram - @SilentXBotz")
 
 
+@routes.get("/health", allow_head=True)
+async def health_route_handler(request):
+    return web.Response(text="OK")
+
+
 @routes.get(r"/watch/{path:\S+}", allow_head=True)
 async def stream_handler(request: web.Request):
     try:
@@ -38,10 +43,14 @@ async def stream_handler(request: web.Request):
         raise web.HTTPForbidden(text=e.message)
     except FIleNotFound as e:
         raise web.HTTPNotFound(text=e.message)
-    except (AttributeError, BadStatusLine, ConnectionResetError):
-        pass
-    except Exception as e:
-        logging.critical(e.with_traceback(None))
+    except (BadStatusLine, ConnectionResetError):
+        logging.debug("Streaming client disconnected")
+        return web.Response(status=499)
+    except AttributeError:
+        logging.exception("Invalid request reached the watch route")
+        raise web.HTTPBadRequest(text="Invalid stream request")
+    except Exception:
+        logging.exception("Unexpected error while rendering the watch page")
         raise web.HTTPInternalServerError(text="An internal error has occurred.")
 
 @routes.get(r"/{path:\S+}", allow_head=True)
@@ -60,10 +69,14 @@ async def stream_handler(request: web.Request):
         raise web.HTTPForbidden(text=e.message)
     except FIleNotFound as e:
         raise web.HTTPNotFound(text=e.message)
-    except (AttributeError, BadStatusLine, ConnectionResetError):
-        pass
-    except Exception as e:
-        logging.critical(e.with_traceback(None))
+    except (BadStatusLine, ConnectionResetError):
+        logging.debug("Streaming client disconnected")
+        return web.Response(status=499)
+    except AttributeError:
+        logging.exception("Invalid request reached the media stream route")
+        raise web.HTTPBadRequest(text="Invalid stream request")
+    except Exception:
+        logging.exception("Unexpected error while streaming media")
         raise web.HTTPInternalServerError(text="An internal error has occurred.")
 
 class_cache = {}

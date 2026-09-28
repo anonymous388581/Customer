@@ -59,8 +59,8 @@ async def check_db_size(db):
     try:
         stats = await db.command("dbstats")
         return stats["dataSize"]
-    except Exception as e:
-        logger.error(f"Database size check error: {e}")
+    except Exception:
+        logger.exception("Database size check failed")
         return 0
          
 async def save_file(bot, media):
@@ -95,8 +95,8 @@ async def save_file(bot, media):
         except DuplicateKeyError:
             print(f'Duplicate file: {file_name}')
             return False, 0
-    except Exception as e:
-        print(f'Save error: {e}')
+    except Exception:
+        logger.exception("Failed to save indexed media file")
         return False, 2
 
 async def get_search_results(chat_id, query, file_type=None, max_results=10, offset=0, filter=False):
@@ -119,7 +119,7 @@ async def get_search_results(chat_id, query, file_type=None, max_results=10, off
 
     try:
         regex = re.compile(raw_pattern, flags=re.IGNORECASE)
-    except:
+    except re.error:
         return []
     if USE_CAPTION_FILTER:
         filter = {'$or': [{'file_name': regex}, {'caption': regex}]}
@@ -157,7 +157,7 @@ async def get_bad_files(query, file_type=None):
         raw_pattern = query.replace(' ', r'.*[\s\.\+\-_()]')
     try:
         regex = re.compile(raw_pattern, flags=re.IGNORECASE)
-    except:
+    except re.error:
         return []
     if USE_CAPTION_FILTER:
         filter = {'$or': [{'file_name': regex}, {'caption': regex}]}

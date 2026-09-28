@@ -1,8 +1,4 @@
-import sys
-import glob
-import importlib
-from pathlib import Path
-from pyrogram import Client, idle, __version__
+from pyrogram import idle, __version__
 from pyrogram.raw.all import layer
 import logging
 import logging.config
@@ -11,18 +7,31 @@ import asyncio
 from datetime import date, datetime
 import pytz
 from aiohttp import web
+from info import *
+
+missing_settings = [
+    name for name, value in (
+        ("API_ID", API_ID),
+        ("API_HASH", API_HASH),
+        ("BOT_TOKEN", BOT_TOKEN),
+        ("DATABASE_URI", DATABASE_URI),
+    ) if not value
+]
+if MULTIPLE_DB and not DATABASE_URI2:
+    missing_settings.append("DATABASE_URI2")
+if missing_settings:
+    raise RuntimeError(
+        "Missing required environment variables: " + ", ".join(missing_settings)
+    )
+
 from database.ia_filterdb import Media, Media2
 from database.users_chats_db import db
-from info import *
 from utils import temp
 from Script import script
 from plugins import web_server, check_expired_premium 
 from Lucia.Bot import SilentX
-from Lucia.util.keepalive import ping_server
 from Lucia.Bot.clients import initialize_clients
 import pyrogram.utils
-from PIL import Image
-import threading, time, requests
 
 logging.config.fileConfig('logging.conf')
 logging.getLogger().setLevel(logging.INFO)
@@ -31,24 +40,8 @@ logging.getLogger("imdbpy").setLevel(logging.ERROR)
 logging.getLogger("aiohttp").setLevel(logging.ERROR)
 logging.getLogger("aiohttp.web").setLevel(logging.ERROR)
 
-botStartTime = time.time()
-ppath = "plugins/*.py"
-files = glob.glob(ppath)
-
 pyrogram.utils.MIN_CHANNEL_ID = -1009147483647
-
-def ping_loop():
-    while True:
-        try:
-            r = requests.get(URL, timeout=10)
-            if r.status_code == 200:
-                print("✅ Ping Successful")
-            else:
-                print(f"⚠️ Ping Failed: {r.status_code}")
-        except Exception as e:
-            print(f"❌ Exception During Ping: {e}")
-        time.sleep(120)
-threading.Thread(target=ping_loop, daemon=True).start()
+botStartTime = time.time()
 
 async def SilentXBotz_start():
     print('Initalizing Your Bot!')
@@ -56,19 +49,6 @@ async def SilentXBotz_start():
     bot_info = await SilentX.get_me()
     SilentX.username = bot_info.username
     await initialize_clients()
-    for name in files:
-        with open(name) as a:
-            patt = Path(a.name)
-            plugin_name = patt.stem.replace(".py", "")
-            plugins_dir = Path(f"plugins/{plugin_name}.py")
-            import_path = "plugins.{}".format(plugin_name)
-            spec = importlib.util.spec_from_file_location(import_path, plugins_dir)
-            load = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(load)
-            sys.modules["plugins." + plugin_name] = load
-            print("Import Plugins - " + plugin_name)
-    if ON_HEROKU:
-        asyncio.create_task(ping_server()) 
     b_users, b_chats = await db.get_banned()
     temp.BANNED_USERS = b_users
     temp.BANNED_CHATS = b_chats
@@ -92,16 +72,18 @@ async def SilentXBotz_start():
     now = datetime.now(tz)
     time = now.strftime("%H:%M:%S %p")
     await SilentX.send_message(chat_id=LOG_CHANNEL, text=script.RESTART_TXT.format(temp.B_LINK, today, time))
-    try:
-        for admin in ADMINS:
+    for admin in ADMINS:
+        try:
             await SilentX.send_message(chat_id=admin, text=f"<b>๏[-ิ_•ิ]๏ {me.mention} Restarted ✅</code></b>")
-    except:
-        pass
+        except Exception:
+            logging.exception("Failed to send a restart notification")
     app = web.AppRunner(await web_server())
     await app.setup()
-    bind_address = "0.0.0.0"
-    await web.TCPSite(app, bind_address, PORT).start()
-    await idle()
+    await web.TCPSite(app, BIND_ADRESS, PORT).start()
+    try:
+        await idle()
+    finally:
+        await app.cleanup()
     
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()

@@ -18,6 +18,14 @@ class Database:
         self.verify_id = self.db.verify_id 
         self.codes = self.db.codes
         self.connection = self.db.connections
+        self.movie_updates = self.db.movie_updates
+
+    async def claim_movie_update(self, movie_name):
+        try:
+            await self.movie_updates.insert_one({'_id': movie_name})
+            return True
+        except DuplicateKeyError:
+            return False
 
     async def find_join_req(self, id):
         return bool(await self.req.find_one({'id': id})) 
@@ -197,7 +205,8 @@ class Database:
                 "last_verified": datetime.datetime(2020, 5, 17, 0, 0, 0, tzinfo=ist_timezone),
                 "second_time_verified": datetime.datetime(2019, 5, 17, 0, 0, 0, tzinfo=ist_timezone),
             }
-            user = await self.misc.insert_one(res)
+            await self.misc.insert_one(res)
+            return res
         return user
 
     async def update_notcopy_user(self, user_id, value:dict):

@@ -72,13 +72,13 @@ async def index_files(bot, query):
 
         print(f"Starting index_files_to_db for chat {chat}, last_msg_id={lst_msg_id}")
         await index_files_to_db(int(lst_msg_id), chat, msg, bot)
-    except Exception as e:
-        print(f"Error in index_files callback: {e}")
+    except Exception:
+        logger.exception("Indexing callback failed")
         await query.answer("An error occurred during processing.", show_alert=True)
 
 
 @Client.on_message(
-    (filters.forwarded | (filters.regex("(https://)?(t\.me/|telegram\.me/|telegram\.dog/)(c/)?(\d+|[a-zA-Z_0-9]+)/(\d+)$"))
+    (filters.forwarded | (filters.regex(r"(https://)?(t\.me/|telegram\.me/|telegram\.dog/)(c/)?(\d+|[a-zA-Z_0-9]+)/(\d+)$"))
     & filters.text ) & filters.private & filters.incoming
 )
 async def send_for_index(bot, message):
@@ -424,9 +424,9 @@ async def index_files_to_db(lst_msg_id, chat, msg, bot):
             )
             if not success:
                 await send_fallback_message(bot, msg.chat.id, final_message)
-        except Exception as e:
-            print(f"Error in index_files_to_db: {e}")
-            error_message = f"❌ Error: {e}"
+        except Exception:
+            logger.exception("Channel indexing failed")
+            error_message = "❌ Indexing failed due to an internal error."
             success = await edit_message_with_retry(
                 bot, msg, error_message,
                 InlineKeyboardMarkup([[InlineKeyboardButton('Close', callback_data='close_data')]])
